@@ -13,12 +13,35 @@ import { AuthService } from 'src/app/auth/auth.service';
 import { SensorEvent } from 'src/app/models/sensorEvent.model';
 import { Stream } from 'stream';
 import * as uuid from 'uuid';
+import { FortLogService, LogIds, logIdToString } from './FortLogService';
 
 interface SensorEventStats {
   timestamp: number;
   previousTimestamp: number;
   count: number;
   values: number[];
+}
+
+type DeviceDocNotification = {
+  service: string;
+  characteristic: string;
+  configCommand?: string;
+  parser?: any;
+}
+
+type DeviceDoc = {
+  type: string;
+  name: string;
+  service?: string;
+  characteristic?: string;
+  companyIdFilter?: number;
+  notifications?: DeviceDocNotification[];
+}
+
+type BleEvent = Event & {
+  target: Event['target'] & {
+    value: DataView;
+  };
 }
 
 export type NstrumentaVideo = {
@@ -80,6 +103,8 @@ export class RecordComponent implements OnInit {
     .observe(Breakpoints.Handset)
     .pipe(map((result) => result.matches));
 
+  private fortLogService: FortLogService | null = null;
+
   constructor(
     private route: ActivatedRoute,
     private afs: AngularFirestore,
@@ -104,7 +129,26 @@ export class RecordComponent implements OnInit {
         })
       )
       .subscribe((data) => {
-        const commonSources = [
+        const commonSources: DeviceDoc[] = [
+          {
+            type: 'bluetooth',
+            name: 'FORT',
+            companyIdFilter: FortLogService.COMPANY_ID,
+            notifications: [
+              {
+                service: FortLogService.SERVICE_UUID,
+                characteristic: FortLogService.NOTIFY_UUID,
+                configCommand: [
+                  FortLogService.DEFAULT_SAMPLE_RATE,
+                  LogIds.DOM_STEP_INFO,
+                  LogIds.DOM_DS_LIN_ACC,
+                  LogIds.TEMPERATURE,
+                  LogIds.TIMESTAMP_FULL,
+                  LogIds.PRESSURE,
+                ].join(),
+              },
+            ],
+          },
           {
             type: 'devicemotion',
             name: 'Device Motion',
@@ -181,7 +225,7 @@ export class RecordComponent implements OnInit {
 
     this.selection.changed.subscribe((change) => {
       console.log('selection.onChange', change);
-      change.added.forEach((selected) => {
+      change.added.forEach((selected: DeviceDoc) => {
         console.log(selected.name + ' selected');
         switch (selected.type.toLowerCase()) {
           case 'devicemotion':
@@ -201,7 +245,7 @@ export class RecordComponent implements OnInit {
             break;
         }
       });
-      change.removed.forEach((selected) => {
+      change.removed.forEach((selected: DeviceDoc) => {
         console.log(selected.name + ' selected');
         switch (selected.type.toLowerCase()) {
           case 'devicemotion':
@@ -226,6 +270,7 @@ export class RecordComponent implements OnInit {
     this.handleThingyRawSensorNotification = this.handleThingyRawSensorNotification.bind(this);
     this.handleBluecoinRawSensorNotification = this.handleBluecoinRawSensorNotification.bind(this);
     this.handleLpomSensorNotification = this.handleLpomSensorNotification.bind(this);
+    this.handleFortMinimalEvt = this.handleFortMinimalEvt.bind(this);
   }
 
   addRecordSource(name) {
@@ -391,13 +436,29 @@ export class RecordComponent implements OnInit {
     });
   }
 
-  startBluetooth(deviceDoc) {
-    navigator.bluetooth
-      // TODO enable acceptAllDevices with a user checkbox
-      .requestDevice({
+  startBluetooth(deviceDoc: DeviceDoc) {
+    let options: RequestDeviceOptions;
+    if (deviceDoc.companyIdFilter) {
+      // Add the companyId filter so that only units with that ID show up when the
+      // BLE scan is run.
+      options = {
+        optionalServices: [deviceDoc.notifications[0].service],
+        filters: [{
+          manufacturerData: [{
+            companyIdentifier: deviceDoc.companyIdFilter,
+          }],
+        }],
+      };
+    } else {
+      options = {
         acceptAllDevices: true,
         optionalServices: [deviceDoc.notifications[0].service],
-      })
+      };
+    }
+
+    navigator.bluetooth
+      // TODO enable acceptAllDevices with a user checkbox
+      .requestDevice(options)
       // .requestDevice({
       //   filters: [
       //     { services: [deviceDoc.notifications[0].service] },
@@ -434,6 +495,13 @@ export class RecordComponent implements OnInit {
           await characteristic.writeValue(configCommand);
         }
         switch (deviceDoc.name) {
+          case 'FORT':
+            this.fortLogService = new FortLogService();
+            characteristic.addEventListener(
+              'characteristicvaluechanged',
+              this.handleFortMinimalEvt
+            );
+            break;
           case 'ST Bluecoin':
             characteristic.addEventListener(
               'characteristicvaluechanged',
@@ -491,7 +559,23 @@ export class RecordComponent implements OnInit {
       });
   }
 
-  handleThingyRawSensorNotification(bleEvent) {
+  handleFortMinimalEvt(bleEvent: BleEvent) {
+    if (this.fortLogService) {
+      const dv = bleEvent.target.value;
+      const log = this.fortLogService.decode(dv);
+      if (log) {
+        const timestamp = Date.now();
+        this.onSensorEvent({
+          timestamp,
+          id: logIdToString(log.id), // Use text for the UI representation.
+          // id: `${log.id}`,
+          values: log.values,
+        });
+      }
+    }
+  }
+
+  handleThingyRawSensorNotification(bleEvent: BleEvent) {
     const accel = Array.from(new Int16Array(bleEvent.target.value.buffer, 0, 3));
     const gyro = Array.from(new Int16Array(bleEvent.target.value.buffer, 6, 3));
     const mag = Array.from(new Int8Array(bleEvent.target.value.buffer, 12, 3));
@@ -504,7 +588,7 @@ export class RecordComponent implements OnInit {
     });
   }
 
-  handleBluecoinRawSensorNotification(bleEvent) {
+  handleBluecoinRawSensorNotification(bleEvent: BleEvent) {
     const timestampArray = new Uint32Array(bleEvent.target.value.buffer, 0, 1).map(Number);
     const accel = Array.from(new Int16Array(bleEvent.target.value.buffer, 4, 3));
     const gyro = Array.from(new Int16Array(bleEvent.target.value.buffer, 10, 3));
@@ -531,7 +615,7 @@ export class RecordComponent implements OnInit {
     });
   }
 
-  handleLpomSensorNotification(bleEvent) {
+  handleLpomSensorNotification(bleEvent: BleEvent) {
     const timestamp = Date.now();
     const buffer = bleEvent.target.value.buffer;
     const sensorId = new Uint8Array(buffer)[0];
@@ -587,7 +671,7 @@ export class RecordComponent implements OnInit {
     });
   }
 
-  stopBluetooth(deviceDoc) {
+  stopBluetooth(deviceDoc: DeviceDoc) {
     if (this.bluetoothDevices[deviceDoc.name]) {
       this.bluetoothDevices[deviceDoc.name].gatt.disconnect();
     }
