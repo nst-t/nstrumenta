@@ -11,8 +11,6 @@ import { Observable, Subject, fromEvent } from 'rxjs';
 import { map, takeUntil } from 'rxjs/operators';
 import { AuthService } from 'src/app/auth/auth.service';
 import { SensorEvent } from 'src/app/models/sensorEvent.model';
-import { Stream } from 'stream';
-import * as uuid from 'uuid';
 import { FortLogService, LogIds, logIdToString } from './FortLogService';
 
 interface SensorEventStats {
