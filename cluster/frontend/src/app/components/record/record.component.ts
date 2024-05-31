@@ -12,6 +12,8 @@ import { map, takeUntil } from 'rxjs/operators';
 import { AuthService } from 'src/app/auth/auth.service';
 import { SensorEvent } from 'src/app/models/sensorEvent.model';
 import { FortLogService, LogIds, logIdToString } from './FortLogService';
+import { NstFusionUtility } from './NstFusionUtility';
+import { MapComponent } from 'src/app/map/map.component';
 
 interface SensorEventStats {
   timestamp: number;
@@ -97,11 +99,17 @@ export class RecordComponent implements OnInit {
   }
   textEncoder = new TextEncoder();
 
+  // This doesn't seem to work for referencing a child compoent. Don't know enough about Angular
+  // to do this yet...
+  // @ViewChild('appMap', { static: false }) appMap: MapComponent;
+  
+
   isHandset$: Observable<boolean> = this.breakpointObserver
     .observe(Breakpoints.Handset)
     .pipe(map((result) => result.matches));
 
   private fortLogService: FortLogService | null = null;
+  private nstFusion: NstFusionUtility | null = null;
 
   constructor(
     private route: ActivatedRoute,
@@ -112,6 +120,10 @@ export class RecordComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    // TODO: Connect.
+    // this.nstFusion = new NstFusionUtility(this.appMap.mapManager);
+    // this.nstFusion.connectToNst();
+
     this.projectId = this.route.snapshot.paramMap.get('projectId');
     this.dataPath = '/projects/' + this.projectId + '/record';
     this.afs
@@ -716,6 +728,9 @@ export class RecordComponent implements OnInit {
             position.coords.speed,
           ],
         });
+
+        // TODO: If walk is not started, then use the most recent position for start values.
+        // otherwise, feed it into MapManager...
       },
       (e) => {
         console.log(e);

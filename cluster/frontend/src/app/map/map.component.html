@@ -1,3 +1,21 @@
 <div #map style="height: 800px"></div>
-<div #shownPaths style="height: 800px"></div>
-<div #trackPath style="height: 800px"></div>
+
+<div style="display: none;">
+  <select 
+    #trackPath
+    class="google-maps-button track-path"
+    [(ngModel)]="trackingMode"
+    (change)="trackingModeChange(trackPath.value)"
+  >
+    <option 
+      *ngFor="let trackingMode of trackingModeOpts;"
+      [value]="trackingMode[0]"
+    >
+      {{trackingMode[1]}}
+    </option>
+  </select>
+
+  <div #shownPaths style="height: 800px">
+  
+  </div>
+</div>

@@ -1,5 +1,5 @@
 import { Component, ElementRef, ViewChild } from '@angular/core';
-import { MapManager } from './MapManager';
+import { MapManager, TrackingMode } from './MapManager';
 import { environment } from 'src/environments/environment';
 import { GoogleMap } from '@angular/google-maps'; // Adjust the import path as needed
 
@@ -9,10 +9,18 @@ import { GoogleMap } from '@angular/google-maps'; // Adjust the import path as n
   styleUrls: ['./map.component.scss'],
 })
 export class MapComponent {
-  @ViewChild('map', { static: false }) map: ElementRef;
-  @ViewChild('shownPaths', { static: false }) shownPaths: ElementRef;
-  @ViewChild('trackPath', { static: false }) trackPath: ElementRef;
+  @ViewChild('map', { static: false }) map: ElementRef<HTMLDivElement>;
+  @ViewChild('shownPaths', { static: false }) shownPaths: ElementRef<HTMLSelectElement>;
+  @ViewChild('trackPath', { static: false }) trackPath: ElementRef<HTMLDivElement>;
   mapManager: MapManager;
+
+  trackingMode = TrackingMode.none;
+  trackingModeOpts: [string, string][] = [
+    [TrackingMode.none, 'No Tracking'],
+    [TrackingMode.gps, 'Track GPS'],
+    [TrackingMode.dom, 'Track DOM'],
+    [TrackingMode.fusion, 'Track Fusion'],
+  ];
 
   constructor() {
     this.mapManager = new MapManager();
@@ -59,5 +67,9 @@ export class MapComponent {
         // this.openErrorModal(errMsg);
         // this.setState({ loading: false });
       });
+  }
+
+  trackingModeChange(newMode: TrackingMode) {
+    this.mapManager.updateTracking(newMode);
   }
 }
