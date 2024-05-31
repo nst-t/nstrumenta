@@ -75,6 +75,9 @@ import { FileSizePipe } from './pipes/file-size.pipe';
 import { SafePipe } from './pipes/safe.pipe';
 import { VscodeService } from './services/vscode.service';
 import { UploadProgressComponent } from './upload-progress/upload-progress.component';
+import { GoogleMapsModule } from '@angular/google-maps';
+import { MapComponent } from './map/map.component';
+
 
 declare let process: any;
 if (process.env.NODE_ENV === 'production') {
@@ -132,6 +135,7 @@ export class SentryErrorHandler implements ErrorHandler {
     MatDividerModule,
     MatProgressBarModule,
     MatChipsModule,
+    GoogleMapsModule,
   ],
   declarations: [
     AppComponent,
@@ -169,6 +173,7 @@ export class SentryErrorHandler implements ErrorHandler {
     ModulesComponent,
     ModuleDetailsComponent,
     UploadProgressComponent,
+    MapComponent,
   ],
   providers: [
     AuthService,
