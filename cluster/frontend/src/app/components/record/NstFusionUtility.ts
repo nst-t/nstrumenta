@@ -35,6 +35,15 @@ export class NstFusionUtility {
       // this.setState({ nstOpen: true, loading: false, expanded: false });
       this.username = username;
       this.channels = this.makeChannels(username);
+      this.mapManager.addUser(this.username, {
+        start: true,
+        dom: true,
+        gps: true,
+        fusion: true,
+        ar: true,
+        waypoints: true,
+      });
+      this.mapManager.updateCurrentUser(this.username);
 
       nstClient.addSubscription(`${Nst.Channels.ON_SETUP}_${username}`, () => {
         nstClient.addSubscription(`${Nst.Channels.FUSION}_${username}`, (msg: Nst.Output) => {
@@ -96,6 +105,7 @@ export class NstFusionUtility {
 
   startWalkEvt(msg: Nst.StartDom) {
     this.mapManager.addStart(this.username, msg.lat, msg.lon);
+    this.mapManager.walkStarted = true;
     this.nstClient.send(this.channels.startWalk, msg);
   }
 
@@ -192,7 +202,7 @@ namespace Nst {
     alt: number;
     altAcc: number;
     decl: number;
-    ls: string;
+    ls: 'gps' | 'manual';
 
     /**
      * To limit traffic, the client can send a bool on the start object

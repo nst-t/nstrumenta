@@ -94,7 +94,6 @@ export class MapManager {
       ],
     });
 
-    // Move our custom controls onto the map.
     if (fields.shownPaths) {
       this.map.controls[google.maps.ControlPosition.TOP_RIGHT].push(fields.shownPaths);
     }
@@ -157,196 +156,36 @@ export class MapManager {
     function makeCurrentPosIcon(url: string) {
       const icon: google.maps.Icon = {
         url,
-        scaledSize: new google.maps.Size(18, 30), // Original image 12x20
+        scaledSize: new google.maps.Size(18, 30),
       };
       return icon;
     }
     function makePointIcon(url: string) {
       const icon: google.maps.Icon = {
         url,
-        scaledSize: new google.maps.Size(6, 6), // Original image is 12x12
-        anchor: new google.maps.Point(3, 3), // Center of the image.
+        scaledSize: new google.maps.Size(6, 6),
+        anchor: new google.maps.Point(3, 3),
       };
       return icon;
     }
 
     this.userIcons = {
-      start: makeCurrentPosIcon('./icons/markers/mm_20_green.png'),
-      currentDom: makeCurrentPosIcon('./icons/markers/mm_20_black.png'),
-      currentGps: makeCurrentPosIcon('./icons/markers/mm_20_blue.png'),
-      currentDomGpsFusion: makeCurrentPosIcon('./icons/markers/mm_20_purple.png'),
-      currentWaypoint: makeCurrentPosIcon('./icons/markers/mm_20_red.png'),
-      domPath: makePointIcon('./icons/circles/black-circle-50percentOpacity.png'),
-      gpsPath: makePointIcon('./icons/circles/blue-circle-50PercentOpacity.png'),
-      domGpsFusionPath: makePointIcon('./icons/circles/purple-circle-50PercentOpacity.png'),
+      start: makeCurrentPosIcon('../../assets/icons/markers/mm_20_green.png'),
+      currentDom: makeCurrentPosIcon('../../assets/icons/markers/mm_20_black.png'),
+      currentGps: makeCurrentPosIcon('../../assets/icons/markers/mm_20_blue.png'),
+      currentDomGpsFusion: makeCurrentPosIcon('../../assets/icons/markers/mm_20_purple.png'),
+      currentWaypoint: makeCurrentPosIcon('../../assets/icons/markers/mm_20_red.png'),
+      domPath: makePointIcon('../../assets/icons/circles/black-circle-50percentOpacity.png'),
+      gpsPath: makePointIcon('../../assets/icons/circles/blue-circle-50PercentOpacity.png'),
+      domGpsFusionPath: makePointIcon('../../assets/icons/circles/purple-circle-50PercentOpacity.png'),
       waypoint: {
-        url: './icons/markers/mm_20_red.png',
+        url: '../../assets/icons/markers/mm_20_red.png',
         scaledSize: new google.maps.Size(12, 20), // Original image 12x20
       },
-      currentAr: makeCurrentPosIcon('./icons/markers/mm_20_yellow.png'),
-      arPath: makePointIcon('./icons/circles/yellow-circle-50PercentOpacity.png'),
+      currentAr: makeCurrentPosIcon('../../assets/icons/markers/mm_20_yellow.png'),
+      arPath: makePointIcon('../../assets/icons/circles/yellow-circle-50PercentOpacity.png'),
     };
 
-    /**
-     * NOTE: This class is nested since 'google' might be undefined elsewhere...
-     * The custom USGSOverlay object contains the USGS image,
-     * the bounds of the image, and a reference to the map.
-     */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    class USGSOverlay extends google.maps.OverlayView {
-      bounds: google.maps.LatLngBounds;
-
-      image: string;
-
-      div?: HTMLDivElement;
-
-      constructor(boundsInner: google.maps.LatLngBounds, imageInner: string) {
-        super();
-        this.bounds = boundsInner;
-        this.image = imageInner;
-      }
-
-      /**
-       * onAdd is called when the map's panes are ready and the overlay has been
-       * added to the map.
-       */
-      onAdd() {
-        this.div = document.createElement('div');
-        this.div.style.borderStyle = 'none';
-        this.div.style.borderWidth = '0px';
-        this.div.style.position = 'absolute';
-
-        // Create the img element and attach it to the div.
-        const img = document.createElement('img');
-
-        img.src = this.image;
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.position = 'absolute';
-        img.style.opacity = '0.75';
-        this.div.appendChild(img);
-
-        // Add the element to the "overlayLayer" pane.
-        const panes = this.getPanes();
-        panes?.overlayLayer.appendChild(this.div);
-      }
-
-      draw() {
-        // We use the south-west and north-east
-        // coordinates of the overlay to peg it to the correct position and size.
-        // To do this, we need to retrieve the projection from the overlay.
-        const overlayProjection = this.getProjection();
-        // Retrieve the south-west and north-east coordinates of this overlay
-        // in LatLngs and convert them to pixel coordinates.
-        // We'll use these coordinates to resize the div.
-        const swPoint = overlayProjection.fromLatLngToDivPixel(this.bounds.getSouthWest());
-        const nePoint = overlayProjection.fromLatLngToDivPixel(this.bounds.getNorthEast());
-
-        // Resize the image's div to fit the indicated dimensions.
-        if (this.div) {
-          this.div.style.left = `${swPoint!.x}px`;
-          this.div.style.top = `${nePoint!.y}px`;
-          this.div.style.width = `${nePoint!.x - swPoint!.x}px`;
-          this.div.style.height = `${swPoint!.y - nePoint!.y}px`;
-        }
-      }
-
-      /**
-       * The onRemove() method will be called automatically from the API if
-       * we ever set the overlay's map property to 'null'.
-       */
-      onRemove() {
-        if (this.div) {
-          this.div.parentNode!.removeChild(this.div);
-          delete this.div;
-        }
-      }
-
-      /**
-       *  Set the visibility to 'hidden' or 'visible'.
-       */
-      hide() {
-        if (this.div) {
-          this.div.style.visibility = 'hidden';
-        }
-      }
-
-      show() {
-        if (this.div) {
-          this.div.style.visibility = 'visible';
-        }
-      }
-
-      toggle() {
-        if (this.div) {
-          if (this.div.style.visibility === 'hidden') {
-            this.show();
-          } else {
-            this.hide();
-          }
-        }
-      }
-
-      toggleDOM(map: google.maps.Map) {
-        if (this.getMap()) {
-          this.setMap(null);
-        } else {
-          this.setMap(map);
-        }
-      }
-    }
-
-    const sw = new google.maps.LatLng(32.76208364661284, -117.16949642676634);
-    const ne = new google.maps.LatLng(32.762729447635465, -117.16864214981514);
-    const bounds = new google.maps.LatLngBounds(sw, ne);
-
-    //doesn't exist?
-    // const overlay = new USGSOverlay(bounds, './overlays/SanDiego_Rot105_9.png');
-    // overlay.setMap(this.map);
-
-    // // Debug looking at wheree the bounds are placed.
-    // const swMarker = new google.maps.Marker({
-    //   position: sw,
-    //   map: this.map,
-    //   draggable: true,
-    // });
-    // swMarker.addListener('drag', (mouseEvent: google.maps.MapMouseEvent) => {
-    //   sw = mouseEvent.latLng!;
-    //   bounds = new google.maps.LatLngBounds(
-    //     sw,
-    //     ne,
-    //   );
-    //   overlay.bounds = bounds;
-    //   overlay.draw();
-    // });
-    // swMarker.addListener('dragend', () => {
-    //   console.log('sw', sw.lat(), ',', ne.lng());
-    // });
-    // const neMarker = new google.maps.Marker({
-    //   position: ne,
-    //   map: this.map,
-    //   draggable: true,
-    // });
-    // neMarker.addListener('drag', (mouseEvent: any) => {
-    //   ne = mouseEvent.latLng;
-    //   bounds = new google.maps.LatLngBounds(
-    //     sw,
-    //     ne,
-    //   );
-    //   overlay.bounds = bounds;
-    //   overlay.draw();
-    // });
-    // neMarker.addListener('dragend', () => {
-    //   console.log('ne', ne.lat(), ',', ne.lng());
-    // });
-
-    // // Debug trying to identify new bound points by clicking on the map.
-    // google.maps.event.addListener(this.map, 'click', (event: any) => {
-    //   console.log(`${event.latLng.lat()}, ${event.latLng.lng()}`);
-    // });
-
-    // This shouldn't be needed since the spinner prevents connecting to nst until the
-    // map is loaded, but just ot be safe...
     this.pendingUserIds.forEach((id) => {
       this.users.set(
         id,

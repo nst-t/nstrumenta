@@ -14,6 +14,7 @@ import { SensorEvent } from 'src/app/models/sensorEvent.model';
 import { FortLogService, LogIds, logIdToString } from './FortLogService';
 import { NstFusionUtility } from './NstFusionUtility';
 import { MapComponent } from 'src/app/map/map.component';
+import { TimestampManager } from './TimestampManager';
 
 interface SensorEventStats {
   timestamp: number;
@@ -99,9 +100,7 @@ export class RecordComponent implements OnInit {
   }
   textEncoder = new TextEncoder();
 
-  // This doesn't seem to work for referencing a child compoent. Don't know enough about Angular
-  // to do this yet...
-  // @ViewChild('appMap', { static: false }) appMap: MapComponent;
+  @ViewChild(MapComponent) appMap: MapComponent;
   
 
   isHandset$: Observable<boolean> = this.breakpointObserver
@@ -110,6 +109,9 @@ export class RecordComponent implements OnInit {
 
   private fortLogService: FortLogService | null = null;
   private nstFusion: NstFusionUtility | null = null;
+  private currLocation: GeolocationPosition | null = null;
+  private walkStarted = false;
+  private tsMngr = new TimestampManager();
 
   constructor(
     private route: ActivatedRoute,
@@ -120,9 +122,7 @@ export class RecordComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    // TODO: Connect.
-    // this.nstFusion = new NstFusionUtility(this.appMap.mapManager);
-    // this.nstFusion.connectToNst();
+    (window as any).tester = this;
 
     this.projectId = this.route.snapshot.paramMap.get('projectId');
     this.dataPath = '/projects/' + this.projectId + '/record';
@@ -281,6 +281,59 @@ export class RecordComponent implements OnInit {
     this.handleBluecoinRawSensorNotification = this.handleBluecoinRawSensorNotification.bind(this);
     this.handleLpomSensorNotification = this.handleLpomSensorNotification.bind(this);
     this.handleFortMinimalEvt = this.handleFortMinimalEvt.bind(this);
+  }
+
+  ngAfterViewInit(): void {
+    // TODO: Add UI or something so the user can connect. Uncomment locally and paste required info
+    // to test.
+    // try {
+    //   this.nstFusion = new NstFusionUtility(this.appMap.mapManager);
+    //   this.nstFusion.connectToNst(
+    //     'wsUrl-placeholder',
+    //     'apiKey-placeholder',
+    //     'username-placeholder',
+    //   );
+    // } catch (ex) {
+    //   console.error(ex)
+    // }
+  }
+
+  startFortWalk() {
+    if (this.walkStarted) {
+      console.error('Walk is already started.');
+      return;
+    }
+
+    if (!this.currLocation) {
+      console.error('We need a start location. Enable Geolocation services.');
+      return;
+    }
+    if (this.tsMngr.firstUpdate) {
+      console.error('We need an initial FORT timestamp. Connect to FORT via BLE and wait for a TIMESTAMP_FULL event.');
+      return;
+    }
+
+    this.nstFusion.startWalkEvt({
+      ts: this.tsMngr.getTsEst(new Date(this.currLocation.timestamp)),
+      lat: this.currLocation.coords.latitude,
+      lon: this.currLocation.coords.longitude,
+      posAcc: this.currLocation.coords.accuracy,
+      alt: this.currLocation.coords.accuracy ?? 0,
+      altAcc: this.currLocation.coords.altitudeAccuracy ?? 0,
+      decl: 0, // TODO... maybe: https://stackoverflow.com/a/77178244/8406615
+      ls: 'gps',
+    });
+    this.walkStarted = true;
+  }
+
+  stopFortWalk() {
+    if (!this.walkStarted) {
+      console.error('Walk is already stopped.');
+      return;
+    }
+
+    this.nstFusion.stopWalkEvt();
+    this.walkStarted = false;
   }
 
   addRecordSource(name) {
@@ -581,6 +634,42 @@ export class RecordComponent implements OnInit {
           // id: `${log.id}`,
           values: log.values,
         });
+
+        switch (log.id) {
+          case LogIds.DOM_DS_LIN_ACC:
+            this.nstFusion.dsEvt({
+              ts: log.ts * 1e-6,
+              x: log.x,
+              y: log.y,
+              z: log.z,
+            });
+            break;
+          case LogIds.PRESSURE:
+            this.nstFusion.pressureEvt({
+              ts: log.ts * 1e-6,
+              value: log.hpaValue,
+            });
+            break;
+          case LogIds.TEMPERATURE:
+            this.nstFusion.temperatureEvt({
+              value: log.degrees,
+            });
+            break;
+          case LogIds.DOM_STEP_INFO:
+            this.nstFusion.domEvt({
+              ts: log.ts * 1e-6,
+              stepNum: log.stepLength,
+              heading: log.heading,
+              conf: log.conf,
+              length: log.stepLength,
+              temp: 0,
+            });
+          case LogIds.TIMESTAMP_FULL:
+            this.tsMngr.updateEstimate(new Date(timestamp), log.ts);
+            break;
+          default:
+            break;
+        }
       }
     }
   }
@@ -731,6 +820,24 @@ export class RecordComponent implements OnInit {
 
         // TODO: If walk is not started, then use the most recent position for start values.
         // otherwise, feed it into MapManager...
+        this.currLocation = position;
+
+        if (this.walkStarted) {
+          this.nstFusion.gspEvt({
+            ts: this.tsMngr.getTsEst(new Date(position.timestamp)),
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+            posAcc: position.coords.accuracy,
+            alt: position.coords.accuracy ?? 0,
+            altAcc: position.coords.altitudeAccuracy ?? 0,
+          });
+        } else {
+          // Just center the map b4 walk start.
+          this.appMap.mapManager.map.setCenter({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+        }
       },
       (e) => {
         console.log(e);

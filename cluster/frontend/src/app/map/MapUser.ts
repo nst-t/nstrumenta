@@ -243,7 +243,6 @@ export class MapUser {
       latLng = new google.maps.LatLng(value.lat, value.lon);
 
       if (value.i < length) {
-        // Old points were adjusted.
         path.setAt(value.i, latLng);
         this.fusion.pathMarkers[value.i].setPosition(latLng);
       } else {
@@ -336,13 +335,11 @@ export class MapUser {
   }
 
   clearAllMarkersAndLines() {
-    // Remove old start marker.
     if (this.start.marker) {
       this.start.marker.setMap(null);
       this.start.marker = null;
     }
 
-    // Remove old dom path polyline and markers.
     this.dom.polyline.getPath().clear();
     if (this.dom.currentMarker) {
       this.dom.currentMarker.setMap(null);
@@ -353,7 +350,6 @@ export class MapUser {
       marker!.setMap(null);
     }
 
-    // Remove old gps path polyline and markers.
     this.gps.polyline.getPath().clear();
     if (this.gps.currentMarker) {
       this.gps.currentMarker.setMap(null);
@@ -364,7 +360,6 @@ export class MapUser {
       marker!.setMap(null);
     }
 
-    // Remove old dom-gps fusion path polyline and markers.
     this.fusion.polyline.getPath().clear();
     if (this.fusion.currentMarker) {
       this.fusion.currentMarker.setMap(null);
@@ -487,14 +482,5 @@ export class MapUser {
     marker.addListener('click', () => {
       infoWindow.open(this.map, marker);
     });
-
-    // marker.addListener('mouseover', () => {
-    //   infoWindow.open(this.map, marker);
-    // });
-
-    // // assuming you also want to hide the infowindow when user mouses-out
-    // marker.addListener('mouseout', () => {
-    //   infoWindow.close();
-    // });
   }
 }
